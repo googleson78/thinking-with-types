@@ -28,19 +28,19 @@ import Unsafe.Coerce (unsafeCoerce)
 --
 -- Idea: A singleton could be used instead of an Int for "true" "proof".
 data Sum (f :: k -> Type) (ts :: [t]) where
-  UnsafeSum :: Int -> t -> Sum f ts
+  UnsafeSum :: Int -> f t -> Sum f ts
 
 inj :: forall f t ts. Member t ts
-    => t -> Sum f ts
+    => f t -> Sum f ts
 inj = UnsafeSum (index @t @ts)
 
 index :: forall t ts. Member t ts => Int
 index = fromIntegral $ natVal $ Proxy @(Eval (FindElem t ts))
 
 proj :: forall f t ts. (Member t ts) => Sum f ts -> Maybe (f t)
-proj (UnsafeSum i x) =
+proj (UnsafeSum i fx) =
   if i == index @t @ts
-  then unsafeCoerce $ Just x
+  then unsafeCoerce $ Just fx
   else Nothing
 
 type FindElem (key :: k) (ts :: [k]) =
