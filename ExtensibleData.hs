@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module ExtensibleData where
 
@@ -28,9 +29,11 @@ import Unsafe.Coerce (unsafeCoerce)
 --
 -- Idea: A singleton could be used instead of an Int for "true" "proof".
 data Sum (f :: k -> Type) (ts :: [t]) where
-  UnsafeSum :: Int -> f t -> Sum f ts
+  UnsafeSum :: Show (f t) => Int -> f t -> Sum f ts
 
-inj :: forall f t ts. Member t ts
+deriving instance Show (Sum f ts)
+
+inj :: forall f t ts. (Member t ts, Show (f t))
     => f t -> Sum f ts
 inj = UnsafeSum (index @t @ts)
 
@@ -40,8 +43,26 @@ index = fromIntegral $ natVal $ Proxy @(Eval (FindElem t ts))
 proj :: forall f t ts. (Member t ts) => Sum f ts -> Maybe (f t)
 proj (UnsafeSum i fx) =
   if i == index @t @ts
-  then unsafeCoerce $ Just fx
+  then Just $ unsafeCoerce fx
   else Nothing
+
+decompose :: Sum f (t ': ts)
+          -> Either (f t)
+                    (Sum f ts)
+decompose (UnsafeSum 0 fx) = Left $ unsafeCoerce fx
+decompose (UnsafeSum n fx) = Right $ UnsafeSum (pred n) fx
+
+decompose' :: Sum f (t ': ts)
+          -> Either (f t)
+                    (Sum f ts)
+decompose' s@(UnsafeSum i fx)
+  = case proj s of
+      Nothing -> Right $ UnsafeSum (pred i) fx
+      Just x  -> Left x
+
+weaken :: Sum f ts -> Sum f (t ': ts)
+weaken (UnsafeSum n fx) = UnsafeSum (succ n) fx
+
 
 type FindElem (key :: k) (ts :: [k]) =
   FromMaybe Stuck =<< FindIndex (TyEq key) ts
